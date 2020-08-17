@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Journal_AAAI</title>
+      <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+      <!-- Link to css file. -->
+      <link rel="stylesheet" type="text/css" href="radviz.css">
+  </head>
+  <body>
+    <div id="title">
+      <h1> Identify features for Cyber Attack</h1>
+    </div>
+
+    <!-- Create html for csv input.https://vincentarelbundock.github.io/Rdatasets/csv/datasets/iris.csv -->
+    <div id="csvInput">
+      <div id="csvInputText">
+      Enter csv url: <input type="text" id="inputURL" size="80px" value="
+      cyberattack.csv">
+      <button type="button" class="button" onclick="loadData()">Load Data!</button>
+      </div>
+      
+    </div>
+
+
+    <!-- Divide page into columns to position items. -->
+    <div class="container">
+      <!-- CENTER COLUMN -->
+       <div class="column-center">
+
+         <div id="visDiv" style="text-align:center; margin-top:5px;">
+         </div>
+
+         <div id="userinput">
+          <form action="" id="setFilter" class="displayStyle" size="30px">
+           <table>
+             <tr>
+               <td id="filterfeatures" class="selectionAlignment"> <p style="margin-bottom:15px" class="title2"> <b>Features</b> </p></td>
+
+          <td><p style="margin-bottom:15px" class="title2"> <b>Operator</b> </p>
+            <select name="Add" id="Operator" style="margin-bottom:15px" class="button" onclick="">
+              <option value="None">None</option>
+              <option value="and">and</option>
+              <option value="or">or</option>
+              <option value="not">not</option>
+              <option value="open">(</option>
+              <option value="close">)</option>
+            </select>
+              </td>
+             </tr>
+
+           </table>
+          </p>
+          <p><input id="suggestfeatures" style="margin-bottom:15px; width:50%">
+            
+          </input></p>
+          <p><button  style="margin-bottom:15px" type="button" class="button" onclick="filter()">Filter tweets!</button>
+          </p>
+         </form>
+
+         <form action="setTweetDisplay" id="setTweetDisplay" class="displayStyle">
+           <p style="margin-bottom:15px" class="title2"> <b>Selected tweets</b> </p>
+           </form>
+           <ol id="tweetDisplay" style="margin-bottom:10px; height:3em"> 
+
+            </ol>
+         
+         </div>
+
+
+       </div>
+
+
+        <!-- LEFT COLUMN -->
+       <div class="column-left">
+
+         <form action="setVariables" id="setVars" class="displayStyle">
+           <p style="margin-bottom:10px" class="title2"> <b>Explore features</b> </p>
+         <table>
+            <tr>
+               <td id="numeric" class="selectionAlignment"></td>
+            </tr>
+          </table>
+          <p></p>
+          <p style="margin-bottom:10px" class="title2"> <b>Augmented features</b> </p>
+          <table>
+              <tr>
+              <td id="wikidata" class="selectionAlignment"></td>
+              </tr>
+         </table>
+         </form>
+
+
+<!--         <form action="" class="displayStyle">
+           <p style="margin-bottom:10px" class="title2"> <b>Augmented features</b> </p>
+                <g>
+                  <input type="radio" value="-1" label="None" name="colorAttribute" checked>None</input>      
+                  <p></p>
+                  <input type="radio" value="" label="Wikidata" name="colorAttribute">Wikidata</input>
+          
+            
+               
+    
+                </g>
+         </form>  -->
+
+
+       </div>
+
+        <!-- RIGHT COLUMN -->
+       <div class="column-right">
+          <form action="setColorVar" id="setColorVar" class="displayStyle">
+           <p style="margin-bottom:15px"> <b>Color by:</b> </p>
+               <table>
+            <tr>
+               <td id="colorVar" class="selectionAlignment">
+               <g><input type="radio" value="-1" label="None" name="colorAttribute" checked></input>
+                  <text>None</text>
+                  <p></p>
+                </g>
+                <g id="colorGroup"></g>
+                </td>
+            </tr>
+         </table>
+         </form>
+         <form action="setTooltipDisplay" id="setTooltipDisplay" class="displayStyle">
+           <p style="margin-bottom:15px" class="title2"> <b>Show in Tooltip:</b> </p>
+            <p id="subtitleDisplay" style="margin-bottom:10px"> (Variables automatically shown) </p>
+               <table>
+            <tr>
+               <td id="tooltip" class="selectionAlignment"></td>
+            </tr>
+         </table>
+         </form>
+         
+       </div>
+    </div>
+
+  <!-- Create html for tooltip selection -->
+  <div id="info" class="hidden">
+    <div class="tooltipText" style="text-align:left">
+      <g id="nonNumeric"></g>
+      <g id="colorCategory"></g>
+      <g id="numeric"></g>
+    </div>
+  </div>
+
+    <script>
+      var dataset;
+      var createVis = function(parent, width, height){
+        var displayVars, springConstants, anchorPoints, tooltipVars, colorVar;
+
+        // Set dimensions.
+        var margins = {top:0, bottom:10, left: 60, right:60};
+        var chartWidth = width - margins.left - margins.right;
+        var chartHeight = height - margins.top - margins.bottom;
+        var center = {x: chartWidth/2, y: chartHeight/2};
+        var radius = Math.min(center.x, center.y);
+        var color = d3.scale.category10();
+
+
+        var svg = d3.select(parent)
+          .append("svg")
+          .attr({width:width, height:height});
+
+        var chart = svg.append("g")
+          .attr("transform", "translate("+margins.left + "," + margins.top + ")");
+
+        var chartBorder = svg.append("g")
+          .attr("transform", "translate("+margins.left + "," + margins.top + ")");
+
+        var angleToPoint = function(angle) {
+          return {
+            x: center.x + radius*Math.cos(angle),
+            y: center.y + radius*Math.sin(angle)
+          };
+        };
+
+
+        // vis() redraws the visualization.
+      var vis = function(){
+
+          // Create anchor points and style anchor points.
+          anchorPoints = displayVars.map(function(d, i, arr){return angleToPoint((2*Math.PI/arr.length)*i);});
+
+          var anchorCircles = chartBorder.selectAll("circle").data(anchorPoints);
+          anchorCircles.exit().remove();
+          anchorCircles.enter().append("circle");
+          anchorCircles
+
+          .attr({
+            cx: function(d){return d.x},
+            cy: function(d){return d.y},
+            r: 2
+          }).style("fill", "black");
+
+
+
+          // Create anchor point labels.
+          var offsetDistance = 7;
+
+          var getTextX = function(d, i) {
+            var xOffset = anchorPoints[i].x - center.x;
+            var yOffset = anchorPoints[i].y - center.y;
+            var angle = Math.atan2(yOffset, xOffset);
+            return anchorPoints[i].x + offsetDistance*Math.cos(angle);
+          };
+          var getTextY = function(d, i) {
+            var xOffset = anchorPoints[i].x - center.x;
+            var yOffset = anchorPoints[i].y - center.y;
+            var angle = Math.atan2(yOffset, xOffset);
+            return anchorPoints[i].y + offsetDistance*Math.sin(angle);
+          };
+          var getTextAnchor = function(d, i) {
+            var xOffset = anchorPoints[i].x - center.x;
+            if (xOffset >= -0.1) return "start";
+            return "end";
+          }
+          var getTextBaseline = function(d, i) {
+            var yOffset = anchorPoints[i].y - center.y;
+            if (yOffset > 0) return "hanging";
+            return "alphabetic";
+          }
+
+          var anchorLabels = chartBorder.selectAll("text").data(displayVars);
+          anchorLabels.exit().remove();
+          anchorLabels.enter().append("text");
+          anchorLabels.attr({
+            x: getTextX,
+            y: getTextY,
+            "font-size": 14,
+            "text-anchor": getTextAnchor,
+            "alignment-baseline": getTextBaseline,
+            "pointer-events": "none"
+          }).text(function(d){return d});
+
+          // Create circle for RadViz
+          chartBorder.append("circle")
+          .attr({
+            cx: center.x - 0.01,
+            cy: center.y,
+            r: radius,
+            })
+            .style("stroke", "gray")    // set the line color
+            .style("fill", "none")
+            .style("stroke-width", 3);
+
+          springConstants = displayVars.map(function(){return d3.scale.linear().range([1, 10]);});
+          springConstants.forEach(function(element, index, array){
+            element.domain(d3.extent(dataset, function(d){return +d[displayVars[index]];}));
+          });
+
+          if (colorVar) color.domain(allValuesOf(dataset, colorVar));
+
+          dataset_cp = dataset
+          var boundary_circles = chart.selectAll("rect").data(dataset_cp);
+          boundary_circles.exit().remove();
+          boundary_circles.enter().append("rect");
+
+          var getPt = function(d) {
+            var list = springConstants.map(function(element, index, array){
+              return element(d[displayVars[index]]);}
+              );
+            var sum = list.reduce(function(prev, cur) {return prev + cur;});
+            
+            var pt = {x:0, y:0};
+            for (var i = 0; i < anchorPoints.length; i++) {
+              pt.x += (list[i]/sum)*anchorPoints[i].x
+              pt.y += (list[i]/sum)*anchorPoints[i].y
+            }
+            
+            return pt;
+          }
+          var dict_1 = {};
+
+          //var getX = function(d) {return getPt(d).x; };
+          var getX = function(d) {if ((getPt(d).x,getPt(d).y) in dict_1){
+            dict_1[(getPt(d).x,getPt(d).y)] += 5
+          } else {dict_1[getPt(d).x,getPt(d).y] = 3};
+          return getPt(d).x; };
+
+          var getY = function(d) {return getPt(d).y; };
+
+          var getWidth = function(d) {console.log(dict_1[getPt(d).x,getPt(d).y]); return 10 + dict_1[getPt(d).x,getPt(d).y];};
+          boundary_circles.transition()
+          .duration(500)
+          .attr({
+            x: getX,
+            y: getY,
+            width: getWidth,
+            height:30,
+            "pointer-events": "none"
+          }).style("fill-opacity", 0)
+            .style("stroke", "gray");
+
+          var circles = chart.selectAll("circle").data(dataset);
+
+          circles.exit().remove();
+
+          circles.enter().append("circle");
+
+          var getPt_1 = function(d) {
+            var list = springConstants.map(function(element, index, array){
+              return element(d[displayVars[index]]);}
+              );
+            var sum = list.reduce(function(prev, cur) {return prev + cur;});
+            
+            var pt = {x:0, y:0};
+            for (var i = 0; i < anchorPoints.length; i++) {
+              pt.x += (list[i]/sum)*anchorPoints[i].x 
+              pt.y += (list[i]/sum)*anchorPoints[i].y 
+
+            }
+            
+            return pt;
+          }
+          var dict = {};
+
+          var getX_1 = function(d) {if ((getPt_1(d).x,getPt_1(d).y) in dict){
+            dict[(getPt_1(d).x,getPt_1(d).y)] += 5
+          } else {dict[(getPt_1(d).x,getPt_1(d).y)] = 3};
+          return getPt_1(d).x + dict[(getPt_1(d).x,getPt_1(d).y)]; };
+
+          var getY_1 = function(d) {return getPt_1(d).y + 15; };
+
+          circles.transition()
+          .duration(500)
+          .attr({
+            cx: getX_1,
+            cy: getY_1,
+            r: 2
+          }).style("fill", function(d){
+            if (!colorVar) {return "orange";}
+            return color(d[colorVar]);});
+          
+          circles.on("mouseover", function(d){
+            d3.select(this)
+              .classed("selected", true)
+              .attr("r", 8);
+
+
+            var info = d3.select("#info");
+
+            var nonNumeric = info.select("#nonNumeric").selectAll("p").data(tooltipVars);
+            nonNumeric.exit().remove();
+            nonNumeric.enter().append("p");
+            nonNumeric.text(function(varName){return varName + ":  " + d[varName]});
+
+            if (colorVar) {
+              var colorCategory = info.select("#colorCategory").selectAll("p").data([colorVar]);
+              colorCategory.exit().remove();
+              colorCategory.enter().append("p")
+
+              colorCategory.text(function(varName){return varName + ":  " + d[varName]})
+                .style("color", function(varName){return color(d[varName]);});
+            }
+
+            var numeric = info.select("#numeric").selectAll("p").data(displayVars);
+            numeric.exit().remove();
+            numeric.enter().append("p");
+            numeric.text(function(varName){return varName + ":  " + d[varName]});
+
+            var coordinates = d3.mouse(svg.node());
+            var bbox = svg.node().getBoundingClientRect();
+            coordinates[0] += bbox.left;
+            coordinates[1] += bbox.top;
+
+            info.style({
+              left: (coordinates[0] + 25) + "px",
+              top: (coordinates[1] ) + "px",
+            })
+            .classed("hidden", false);
+
+          })
+          .on("mouseout", function(d){
+            d3.select(this)
+              .classed("selected", false)
+              .attr("r", 2);
+
+              var info = d3.select("#info");
+              info.classed("hidden", true);
+          });
+
+        };
+
+
+        vis.loadData = function(data){
+          dataset = data;
+          return vis;
+        }
+
+        vis.setVars = function(value){
+          if (!arguments.length) return displayVars;
+          displayVars = value;
+          return vis;
+        }
+
+        vis.setTooltipVars = function(value) {
+          if (!arguments.length) return tooltipVars;
+          tooltipVars = value;
+          return vis;
+        }
+
+        vis.setColorVar = function(value) {
+          if (!arguments.length) return colorVar;
+          colorVar = value;
+          return vis;
+        }
+
+        return vis;
+      };
+
+      var allValuesOf = function(data, variable) {
+          var values = [];
+          for (var i=0; i<data.length; i++){
+            if (!values.includes(data[i][variable])) {
+              values.push(data[i][variable]);
+            }
+          }
+          return values;
+        };
+
+      var vis = createVis("#visDiv", 700,700);
+
+      var loadData   = function() {
+        url = document.getElementById("inputURL").value;
+        console.log(url);
+
+        d3.csv("tweetstoannotate_v2.csv",
+          function(dataset) { if(!dataset) {alert("Invalid data"); return;}
+
+            //copied from: http://stackoverflow.com/questions/18082/validate-decimal-numbers-in-javascript-isnumeric
+            var isNumeric = function( n ) {
+              return !isNaN(parseFloat(n)) && isFinite(n);
+            }
+
+            var addToTable = function(propertyList, parent, name, type) {
+
+              var inputlist = d3.select(parent).selectAll("g").data(propertyList);
+
+              inputlist.exit().remove();
+
+              var groups = inputlist.enter().append("g");
+              groups.append("input");
+              groups.append("text");
+
+              inputlist.select("input")
+              .attr({
+                "type":type,
+                "value":function(d){return d},
+                "label":function(d){return d},
+                "name":name
+              });
+
+              inputlist.select("text").text(function(d){return d}).append("p");
+            };
+
+            var numericProps = [];
+            var wikidataProps = [];
+            var allProps = [];
+
+            for (property in dataset[0]) {
+              if (isNumeric(dataset[0][property])) {
+                allProps.push(property)
+                if(property.startsWith("wiki")){
+                  wikidataProps.push(property)
+                }
+                else
+                {
+                  numericProps.push(property);
+                }
+              }
+            }
+            addToTable(numericProps, "#numeric", "numericAttribute", "checkbox");
+            addToTable(wikidataProps, "#wikidata", "numericAttribute", "checkbox");
+            addToTable(allProps, "#filterfeatures", "filterAttribute", "radio");
+            //adding all data attributes to tooltip table
+
+
+            addToTable(Object.keys(dataset[0]), "#tooltip", "tooltipAttribute", "checkbox");
+
+            //find categorical vars
+            var categoricalVars = [];
+            for (property in dataset[0]) {
+              
+              if( (property.localeCompare("Prediction")==0) || (property.localeCompare("Topic")==0) ) {
+                categoricalVars.push(property);
+              }
+/*              if (!isNumeric(dataset[0][property])) {
+                categoricalVars.push(property);
+              }*/
+            }
+
+            addToTable(categoricalVars, "#colorGroup", "colorAttribute", "radio");
+
+            vis.loadData(dataset);
+            vis.setVars([]);
+            vis.setTooltipVars([]);
+            vis();
+        });
+
+        // Allow for user to adjust displayed variables and redraws vis as changes occur.
+        var numericAttributeSelection = d3.select("#setVars").on("change", function(d){
+          var selection = document.querySelectorAll('input[name="numericAttribute"]:checked');
+          var variables = [];
+          if (selection.length > 5){
+            alert("Choose 5 features at most for optimally exploring features")
+          }
+          for (var i=0; i<selection.length; i++) {
+            variables.push(selection[i].value);
+          }
+          vis.setVars(variables);
+          vis();
+        });
+
+/*        var filterAttributeSelection = d3.select("#setFilter").on("change", function(d){
+          var selection = document.querySelectorAll('input[name="filterAttribute"]:checked');
+          var variables = [];
+          for (var i=0; i<selection.length; i++) {
+            variables.push(selection[i].value);
+          }
+          vis.setVars(variables);
+          vis();
+        });*/
+
+
+        var tooltipAttributeSelection = d3.select("#setTooltipDisplay").on("change", function(d){
+          var selection = document.querySelectorAll('input[name="tooltipAttribute"]:checked');
+          var variables = [];
+
+          for (var i=0; i<selection.length; i++) {
+            variables.push(selection[i].value);
+          }
+
+          vis.setTooltipVars(variables);
+          vis();
+        });
+
+        var colorAttributeSelection = d3.select("#setColorVar").on("change", function(d){
+          var selection = document.querySelector('input[name="colorAttribute"]:checked');
+          var val = selection.value;
+          if (val == "-1") vis.setColorVar(null);
+          else vis.setColorVar(val);
+          vis();
+        })
+
+
+        var appendFilter = d3.select("#filterfeatures").on("click",function(d){
+          var selection = document.querySelector('input[name="filterAttribute"]:checked');
+          //console.log(selection.value)
+          temp = document.querySelector('input[id="suggestfeatures"]')
+          temp.value = document.querySelector('input[id="suggestfeatures"]').value +" "+ selection.value
+        })
+
+        var appendOperator = d3.select("#Operator").on("change",function(d){
+          var selection = document.querySelector('select[id="Operator"]');
+          /*console.log(selection.options[selection.selectedIndex].value)*/
+          temp = document.querySelector('input[id="suggestfeatures"]')
+          temp.value = document.querySelector('input[id="suggestfeatures"]').value +" "+selection.value
+          document.querySelector('select[id="Operator"]').value = "None"
+        })
+
+
+      }
+
+      var filter = function() {
+        filterData = document.getElementById("suggestfeatures").value;
+        filterData = filterData.trim().split(" ")
+        filteredindices1 = []
+        filteredindices2 = []
+        filteredindices = []
+        for (each in filterData){
+          if (filterData[each] != ""){
+            for (i=0; i<dataset.length;i++){
+              //console.log(dataset[i]['tweet_text'])
+              //console.log(filterData[each])
+              //console.log(each)
+              //if ((each==0) && (dataset[i]['tweet_text']).includes(filterData[each])) {
+                  //console.log(dataset[i]['tweet_text'])
+              if ((each==0) && (dataset[i][filterData[each]]==1) ) {
+                  filteredindices1.push(i)
+                  //console.log(filteredindices1)
+                  }
+              if ((each==2) && (dataset[i][filterData[each]]==1) ){
+                  filteredindices2.push(i)
+                  }
+              } 
+            }
+         }
+        if(filteredindices2.length == 0){
+
+          filteredindices = filteredindices1}
+        
+        if(filterData[1]== "not"){
+          filteredindices = filteredindices1.filter(n => !filteredindices2.includes(n))
+
+        }
+        if(filterData[1] == "and"){
+          filteredindices = filteredindices1.filter(n=> filteredindices2.includes(n))
+        }
+
+        if(filterData[1] == "or"){
+          filteredindices = new Set(filteredindices)
+        }
+
+         console.log(filteredindices)
+         tempdata = ""
+         for (each in filteredindices)
+         {
+          //console.log(filteredindices[each])
+          if(dataset[(filteredindices[each])]['Prediction'] == "yes"){
+            tempdata += '<li><font color="orange">' + dataset[(filteredindices[each])]['tweet_text'] + '</font></li>'
+          }
+          else{
+            tempdata += '<li>' + dataset[(filteredindices[each])]['tweet_text'] + '</li>'
+          }
+          
+          //document.getElementById("tweetDisplay").innerHTML = document.getElementById("tweetDisplay").innerHTML + '<p>' + dataset[(filteredindices[each])]['tweet_text'] + '</p>'
+          document.getElementById("tweetDisplay").innerHTML = tempdata
+         }
+         //console.log(tempdata)
+         //console.log(document.getElementById("tweetDisplay").innerHTML )
+
+      }
+    </script>
+  </body>
+</html>
