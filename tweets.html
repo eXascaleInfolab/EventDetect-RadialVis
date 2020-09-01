@@ -566,6 +566,10 @@
       var filter = function() {
         filterData = document.getElementById("suggestfeatures").value;
         filterData = filterData.trim().split(" ")
+        filterData = filterData.filter(n => {return n!=""})
+        if (filterData.length>3){
+          alert("Choose any 2 features with 'and', 'or', or 'not' operator in between.") 
+        }
         filteredindices1 = []
         filteredindices2 = []
         filteredindices = []
@@ -600,7 +604,13 @@
         }
 
         if(filterData[1] == "or"){
-          filteredindices = new Set(filteredindices)
+          for(each in filteredindices1){
+            filteredindices.push(each)
+          }
+         for(each in filteredindices2){
+            filteredindices.push(each)
+          }
+           filteredindices.filter((v, i, a) => a.indexOf(v) === i); 
         }
 
          console.log(filteredindices)
@@ -616,8 +626,8 @@
           }
           
           //document.getElementById("tweetDisplay").innerHTML = document.getElementById("tweetDisplay").innerHTML + '<p>' + dataset[(filteredindices[each])]['tweet_text'] + '</p>'
-          document.getElementById("tweetDisplay").innerHTML = tempdata
          }
+         document.getElementById("tweetDisplay").innerHTML = tempdata
          //console.log(tempdata)
          //console.log(document.getElementById("tweetDisplay").innerHTML )
 
