@@ -100,3 +100,13 @@ div.container{
     background-color: #63d297;
     color: white;
 }
+[data-tooltip]:before {            
+     content : attr(data-tooltip);
+     opacity : 0;
+}
+[data-tooltip]:hover:before {        
+    opacity : 1;
+}
+[data-tooltip]:not([data-tooltip-persistent]):before {
+    pointer-events: none;
+}
